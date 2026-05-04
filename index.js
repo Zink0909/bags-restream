@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+console.log('Starting Bags ReStream service...');
 
 const BAGS_API_KEY = process.env.BAGS_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
