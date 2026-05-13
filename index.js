@@ -198,7 +198,7 @@ function connect() {
     await saveToSupabase(mint, data);
 
     // Alert if Breakout
-    if (data.tag === 'Breakout' && data.potentialScore >= 60) {
+    if (data.tag === 'Breakout' && data.potentialScore >= 70) {
       const msg = [
         `⚡ <b>New Breakout Launch</b> — ${data.symbol || mint.slice(0, 8)}`,
         ``,
