@@ -9,7 +9,39 @@ const BAGS_ALPHA_URL = process.env.BAGS_ALPHA_URL || 'https://bags-alpha-pied.ve
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-const SEEN_MINTS = new Set();
+const SEEN_MINTS = new Set(); // in-memory fast filter, reset on restart
+
+async function hasBeenAlerted(mint) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/alerted_tokens?mint=eq.${mint}&select=mint`,
+      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function markAsAlerted(mint) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/alerted_tokens`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer': 'return=minimal,resolution=ignore-duplicates',
+      },
+      body: JSON.stringify({ mint }),
+    });
+  } catch (e) {
+    console.error('markAsAlerted error:', e.message);
+  }
+}
 
 function extractMint(strings) {
   for (const s of strings) {
@@ -127,7 +159,16 @@ function connect() {
     const mint = extractMint(strings);
     if (!mint) return;
     if (SEEN_MINTS.has(mint)) return;
+
+    // Check Supabase for persistence across restarts
+    const alreadyAlerted = await hasBeenAlerted(mint);
+    if (alreadyAlerted) {
+      SEEN_MINTS.add(mint);
+      return;
+    }
+
     SEEN_MINTS.add(mint);
+    await markAsAlerted(mint);
 
     console.log('New token launch:', mint);
 
