@@ -138,16 +138,30 @@ async function sendTelegram(message) {
   }
 }
 
+let failCount = 0;
+let alertSent = false;
+const ALERT_THRESHOLD = 5;
+const MAX_BACKOFF_MS = 60_000;
+
 function connect() {
-  console.log('Connecting to ReStream...');
+  let didOpen = false;
+  console.log(`Connecting to ReStream... (attempt ${failCount + 1})`);
   const ws = new WebSocket('wss://restream.bags.fm');
 
   ws.on('open', () => {
+    didOpen = true;
+    if (alertSent) {
+      sendTelegram('✅ <b>Bags ReStream recovered</b> — connection restored.');
+      alertSent = false;
+    }
+    failCount = 0;
     console.log('Connected!');
     ws.send(JSON.stringify({ type: 'subscribe', event: 'launchpad_launch:BAGS' }));
-    setInterval(() => {
+    const ping = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'ping' }));
+      } else {
+        clearInterval(ping);
       }
     }, 30000);
   });
@@ -204,8 +218,20 @@ function connect() {
   ws.on('error', (e) => console.error('WS error:', e.message));
 
   ws.on('close', (code, reason) => {
-    console.log(`Disconnected: ${code} ${reason}. Reconnecting in 5s...`);
-    setTimeout(connect, 5000);
+    if (!didOpen) {
+      failCount++;
+    } else {
+      failCount = 0;
+    }
+    const delay = Math.min(5000 * Math.pow(2, Math.min(failCount, 6)), MAX_BACKOFF_MS);
+    console.log(`Disconnected: ${code} ${reason}. Reconnecting in ${delay / 1000}s... (failures: ${failCount})`);
+
+    if (failCount >= ALERT_THRESHOLD && !alertSent) {
+      sendTelegram(`🚨 <b>Bags ReStream down</b> — ${failCount} consecutive connection failures. Check Railway logs.`);
+      alertSent = true;
+    }
+
+    setTimeout(connect, delay);
   });
 }
 
