@@ -16,7 +16,7 @@ async function hasBeenAlerted(mint) {
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/alerted_tokens?mint=eq.${mint}&select=mint`,
-      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }, signal: AbortSignal.timeout(5_000) }
     );
     const data = await res.json();
     return Array.isArray(data) && data.length > 0;
@@ -37,6 +37,7 @@ async function markAsAlerted(mint) {
         'Prefer': 'return=minimal,resolution=ignore-duplicates',
       },
       body: JSON.stringify({ mint }),
+      signal: AbortSignal.timeout(5_000),
     });
   } catch (e) {
     console.error('markAsAlerted error:', e.message);
@@ -80,7 +81,7 @@ function extractStrings(buf) {
 
 async function analyzeToken(mint) {
   try {
-    const res = await fetch(`${BAGS_ALPHA_URL}/api/analyze-single?mint=${mint}`);
+    const res = await fetch(`${BAGS_ALPHA_URL}/api/analyze-single?mint=${mint}`, { signal: AbortSignal.timeout(15_000) });
     const data = await res.json();
     return data.success ? data : null;
   } catch (e) {
@@ -100,6 +101,7 @@ async function saveToSupabase(mint, data) {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Prefer': 'return=minimal',
       },
+      signal: AbortSignal.timeout(10_000),
       body: JSON.stringify({
         mint,
         symbol: data.symbol || '',
@@ -126,6 +128,7 @@ async function sendTelegram(message) {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10_000),
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
