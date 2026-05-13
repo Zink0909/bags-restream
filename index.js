@@ -176,15 +176,12 @@ function connect() {
     const mint = extractMint(strings);
     if (!mint) return;
     if (SEEN_MINTS.has(mint)) return;
+    SEEN_MINTS.add(mint); // claim immediately to block concurrent messages for same mint
 
     // Check Supabase for persistence across restarts
     const alreadyAlerted = await hasBeenAlerted(mint);
-    if (alreadyAlerted) {
-      SEEN_MINTS.add(mint);
-      return;
-    }
+    if (alreadyAlerted) return;
 
-    SEEN_MINTS.add(mint);
     await markAsAlerted(mint);
 
     console.log('New token launch:', mint);
@@ -210,7 +207,7 @@ function connect() {
         `  Conversion: ${data.conversionScore}`,
         `  Momentum: ${data.momentumScore}`,
         ``,
-        `<a href="https://bags-alpha-pied.vercel.app/token/${mint}">View on Bags Alpha</a>`,
+        `<a href="${BAGS_ALPHA_URL}/token/${mint}">View on Bags Alpha</a>`,
         `<a href="https://bags.fm/${mint}">Trade on Bags.fm</a>`,
       ].join('\n');
       await sendTelegram(msg);
